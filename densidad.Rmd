@@ -1,0 +1,122 @@
+---
+title: "DENSITAT"
+author: "urbanisme"
+date: "Friday, January 08, 2016"
+output: html_document
+---
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+
+```{r}
+library("rgdal")
+library("maptools")
+library("gridExtra")
+library("dplyr")
+library("rgeos")
+
+a<- readOGR(dsn = "G:/TORREDEMBARRA/43_155_UA_2015-09-25_SHF/PARCELA", layer = "PARCELAdatosCorregida",stringsAsFactors=FALSE)
+
+a.df <- as(a, "data.frame")
+
+b.df<-a.df %>% group_by(CONTROL) %>% summarise(viv=sum(nV),
+                                               com=sum(nC),
+                                               area=sum(AREA))
+b.df=as.data.frame(b.df)
+head(b.df)
+row.names(b.df)<-b.df$CONTROL
+
+# EXPERIMENTAL PLOT a.df #########################################
+
+#pairs(~mpg+disp+drat+wt, data=mtcars)
+aplot<-subset(a.df,supcons<1000 &supcubiert<1000 & nC<10 & AREA<5000)
+
+# PLOT1
+pairs(~nV+nC+AREA+supcons+supcubiert, data=aplot, panel=panel.smooth)
+cor(aplot[c("nV", "nC", "supcons", "supcubiert")])
+
+# PLOT2
+library(car)
+scatterplotMatrix(~nV+nC+AREA+supcons+supcubiert, data=aplot, spread=FALSE,
+ lty.smooth=2)
+
+# PLOT3
+scatterplotMatrix(~nV+nC+AREA+supcons+supcubiert | nV, data=aplot,
+ spread=FALSE, diagonal="histogram",
+ main="Scatter Plot Matrix via car Package")
+
+# PLOT4
+with(aplot,smoothScatter(supcons,supcubiert, main="Scatterplot Colored by Smoothed Densities"))
+
+# OTHER LIBRARIES ##############################
+library(IDPmisc)
+with(aplot,
+ iplot(supcons,supcubiert, main="Image Scatter Plot with Color Indicating Density"))
+
+library(hexbin)
+with(aplot, {
+ bin <- hexbin(supcons,supcubiert, xbins=50)
+ plot(bin, main="Hexagonal Binning with supcons Observations")
+ })
+
+library(scatterplot3d)
+attach(aplot)
+scatterplot3d(nV, nC, supcons,
+ main="Basic 3D Scatter Plot")
+
+library(rgl)
+attach(aplot)
+plot3d(nV, supcubiert, supcons, col="red", size=5)
+
+library(Rcmdr)
+attach(aplot)
+scatter3d(nV, supcons, supcubiert)
+
+
+aplot2<-aplot[c("nV","nC","supcons","supcubiert","AREA")]
+table(aplot2$nV=='NA')
+options(digits=2)
+cor(aplot2) # Solo funciona con datos numericos
+library(corrgram)
+corrgram(aplot, order=TRUE, lower.panel=panel.shade,
+ upper.panel=panel.pie, text.panel=panel.txt,
+ main="Correlogram of mtcars intercorrelations")
+
+library(corrgram)
+corrgram(aplot2, order=TRUE, lower.panel=panel.ellipse,
+ upper.panel=panel.pts, text.panel=panel.txt,
+ diag.panel=panel.minmax,
+ main="Correlogram of parameters data using scatter plots and ellipses")
+
+library(corrgram)
+corrgram(aplot2, order=TRUE, lower.panel=panel.shade,
+ upper.panel=panel.pie, text.panel=panel.txt,
+ main="Correlogram of mtcars intercorrelations")
+
+##################################################################
+
+# Generate IDs for grouping
+a@data$id<-a@data$CONTROL
+
+# Merge polygons by ID
+b<- unionSpatialPolygons(a, a$id)
+head(b,1)
+row.names(b.df)
+
+# Plotting
+plot(a)
+plot(b, add = TRUE, border = "red", lwd = 2)
+
+# Reconvert data frame to SpatialPolygons
+#region <- gUnaryUnion(a, id = a@data$CONTROL)
+row.names(b)
+row.names(b.df)
+b.shp <- SpatialPolygonsDataFrame(b , b.df)
+
+writeOGR(b.shp, dsn = "E:/TORREDEMBARRA/43_155_UA_2015-09-25_SHF/PARCELA", layer = "MASAdatosVIV", driver='ESRI Shapefile')
+
+str(b.shp@data)
+plot(b.shp, col=b.shp$area/b.shp$viv)
+
+```
+
